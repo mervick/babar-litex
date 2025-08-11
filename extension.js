@@ -30,6 +30,23 @@ const N_ = x => x;
 const WORKSPACES_SCHEMA = "org.gnome.desktop.wm.preferences";
 const WORKSPACES_KEY = "workspace-names";
 
+// /usr/share/icons/ePapirus-Dark/16x16/actions/labplot-cursor-arrow.svg
+// /usr/share/icons/Papirus-Dark/24x24/actions/expand.svg
+// /usr/share/icons/ePapirus-Dark/24x24/actions/usermenu-down.svg
+// /usr/share/icons/ePapirus-Dark/22x22/actions/open-menu.svg
+// /usr/share/icons/ePapirus-Dark/16x16/actions/overflow-menu.svg
+// /usr/share/icons/Yaru/scalable/actions/go-down-symbolic.svg
+// /usr/share/icons/Yaru/scalable/ui/pan-down-symbolic.svg
+// /usr/share/icons/Adwaita/scalable/actions/view-more-symbolic.svg
+//
+//
+//
+//
+//
+//
+//
+//
+//
 // settings
 const RIGHT_CLICK = true;
 const MIDDLE_CLICK = false;
@@ -38,13 +55,15 @@ const APP_GRID_ICON_NAME = 'view-app-grid-symbolic';
 const PLACES_ICON_NAME = 'folder-symbolic';
 const FAVORITES_ICON_NAME = 'starred-symbolic';
 const FALLBACK_ICON_NAME = 'applications-system-symbolic';
+const APP_BTN_ICON_NAME = 'view-more-symbolic';
 const ICON_SIZE = 16;
 const TOOLTIP_VERTICAL_PADDING = 10;
 const HIDDEN_OPACITY = 127;
 const UNFOCUSED_OPACITY = 255;
 const FOCUSED_OPACITY = 255;
 const DISPLAY_ACTIVITIES = false;
-const DISPLAY_APP_GRID = true;
+const DISPLAY_APP_GRID = false;
+const DISPLAY_APP_BTN_MENU = true;
 const DISPLAY_PLACES_ICON = false;
 const DISPLAY_FAVORITES = false;
 const DISPLAY_WORKSPACES = false;
@@ -60,9 +79,9 @@ class AppGridButton extends PanelMenu.Button {
 
     this.app_grid_button = new St.BoxLayout({visible: true, reactive: true, can_focus: true, track_hover: true});
     this.app_grid_button.icon = new St.Icon({icon_name: APP_GRID_ICON_NAME, style_class: 'system-status-icon'});
-        this.app_grid_button.add_child(this.app_grid_button.icon);
+    this.app_grid_button.add_child(this.app_grid_button.icon);
     this.app_grid_button.connect('button-release-event', this._show_apps_page.bind(this));
-        this.add_child(this.app_grid_button);
+    this.add_child(this.app_grid_button);
   }
 
   _show_apps_page() {
@@ -78,6 +97,53 @@ class AppGridButton extends PanelMenu.Button {
   }
 });
 
+let AppMenuButton = GObject.registerClass(
+class AppMenuButton extends PanelMenu.Button {
+  _init() {
+    super._init(0.0, 'Babar-AppMenuButton');
+
+    this.app_menu_button = new St.BoxLayout({});
+    this.app_menu_icon = new St.Icon({icon_name: APP_BTN_ICON_NAME, style_class: 'system-status-icon'});
+    this.app_menu_button.add_child(this.app_menu_icon);
+    this.app_menu_button.connect('button-release-event', this._onButtonPressEvent.bind(this));
+    this.app_menu_button.connect('button-press-event', this._onButtonPressEvent.bind(this));
+    this.app_menu_icon.connect('button-release-event', this._onButtonPressEvent.bind(this));
+    this.app_menu_icon.connect('button-press-event', this._onButtonPressEvent.bind(this));
+    this.add_child(this.app_menu_button);
+  }
+
+  _onButtonPressEvent(actor, event) {
+    // if (Main.modalCount > 0 || actor != event.get_source()) {
+    //   return Clutter.EVENT_PROPAGATE;
+    // }
+
+    const focusWindow = global.unite.focusWindow;
+
+    if (!focusWindow/* || !focusWindow.hideTitlebars*/) {
+      return Clutter.EVENT_PROPAGATE;
+    }
+
+    return this._openWindowMenu(focusWindow.win, event.get_coords()[0])
+  }
+
+  _openWindowMenu(win, x) {
+    const rect = this._menuPositionRect(x);
+    const type = Meta.WindowMenuType.WM;
+
+    Main.wm._windowMenuManager.showWindowMenuForWindow(win, type, rect);
+    return Clutter.EVENT_STOP;
+  }
+
+  _menuPositionRect(x) {
+    const size = Main.panel.height;
+    return { x: x - size, y: 0, width: size * 2, height: size };
+  }
+
+  _destroy() {
+    super.destroy();
+  }
+});
+
 let FavoritesMenu = GObject.registerClass(
 class FavoritesMenu extends PanelMenu.Button {
   _init() {
@@ -85,10 +151,10 @@ class FavoritesMenu extends PanelMenu.Button {
 
     this.fav_changed = AppFavorites.getAppFavorites().connect('changed', this._display_favorites.bind(this));
 
-      this.fav_menu_button = new St.BoxLayout({});
+    this.fav_menu_button = new St.BoxLayout({});
     this.fav_menu_icon = new St.Icon({icon_name: FAVORITES_ICON_NAME, style_class: 'system-status-icon'});
-        this.fav_menu_button.add_child(this.fav_menu_icon);
-        this.add_child(this.fav_menu_button);
+    this.fav_menu_button.add_child(this.fav_menu_icon);
+    this.add_child(this.fav_menu_button);
 
     this._display_favorites();
   }
@@ -100,16 +166,16 @@ class FavoritesMenu extends PanelMenu.Button {
     }
 
     // get favorites list
-      this.list_fav = AppFavorites.getAppFavorites().getFavorites();
+    this.list_fav = AppFavorites.getAppFavorites().getFavorites();
 
-        // create favorites items
+    // create favorites items
     for (let fav_index = 0; fav_index < this.list_fav.length; ++fav_index) {
-        this.fav = this.list_fav[fav_index];
-        this.fav_icon = this.fav.create_icon_texture(64);
+      this.fav = this.list_fav[fav_index];
+      this.fav_icon = this.fav.create_icon_texture(64);
 
       this.item = new PopupMenu.PopupImageMenuItem(this.fav.get_name(), this.fav_icon.get_gicon());
-        this.item.connect('activate', () => this._activate_fav(fav_index));
-        this.menu.addMenuItem(this.item);
+      this.item.connect('activate', () => this._activate_fav(fav_index));
+      this.menu.addMenuItem(this.item);
 
       // drag and drop
       this.item.fav_index = fav_index;
@@ -120,7 +186,7 @@ class FavoritesMenu extends PanelMenu.Button {
 
       this.item._draggable.connect('drag-end', this._on_drag_end.bind(this));
       this.item._draggable.connect('drag-cancelled', this._on_drag_end.bind(this));
-      }
+    }
   }
 
   _on_drag_end() {
@@ -129,8 +195,8 @@ class FavoritesMenu extends PanelMenu.Button {
   }
 
   _activate_fav(fav_index) {
-      AppFavorites.getAppFavorites().getFavorites()[fav_index].open_new_window(-1);
-    }
+    AppFavorites.getAppFavorites().getFavorites()[fav_index].open_new_window(-1);
+  }
 
   _destroy() {
     if (this.fav_changed) {
@@ -533,6 +599,12 @@ class Extension {
       Main.panel.addToStatusArea('babar-app-grid-button', this.app_grid, 0, 'left');
     }
 
+    // app menu
+    if (DISPLAY_APP_BTN_MENU) {
+      this.app_menu_btn = new AppMenuButton();
+      Main.panel.addToStatusArea('babar-app-menu-button', this.app_menu_btn, 1, 'left');
+    }
+
     // Places label to icon
     if (DISPLAY_PLACES_ICON) {
       this._show_places_icon(true);
@@ -552,7 +624,7 @@ class Extension {
     }
 
     // AppMenu
-      if (!DISPLAY_APP_MENU) {
+    if (!DISPLAY_APP_MENU) {
       AppMenu.container.hide();
     }
 
@@ -566,6 +638,11 @@ class Extension {
     // app grid
     if (DISPLAY_APP_GRID && this.app_grid) {
       this.app_grid._destroy();
+    }
+
+    // app menu
+    if (DISPLAY_APP_BTN_MENU) {
+      this.app_menu_btn._destroy();
     }
 
     // favorites
